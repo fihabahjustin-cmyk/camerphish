@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CamerPhish — Détecteur de Phishing 🇨🇲</title>
+<style>
+:root {
+  --primary: #006400;
+  --primary-light: #008000;
+  --red: #c0392b;
+  --orange: #e67e22;
+  --yellow: #f39c12;
+  --green: #27ae60;
+  --gray: #f4f6f9;
+  --border: #dde3ec;
+  --text: #1a1a2e;
+  --muted: #6b7280;
+  --white: #ffffff;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', system-ui, Arial, sans-serif; background: var(--gray); color: var(--text); min-height: 100vh; }
+
+/* HEADER */
+.header {
+  background: linear-gradient(135deg, #003300 0%, #006400 50%, #1a5c00 100%);
+  padding: 0; position: relative; overflow: hidden;
+}
+.header::after {
+  content: ''; position: absolute; bottom: -30px; right: -30px;
+  width: 200px; height: 200px; background: rgba(255,255,255,0.03); border-radius: 50%;
+}
+.header-inner { max-width: 900px; margin: 0 auto; padding: 40px 24px 36px; position: relative; z-index: 1; text-align: center; }
+.flag { font-size: 36px; margin-bottom: 12px; }
+.header h1 { color: white; font-size: 36px; font-weight: 800; letter-spacing: -0.5px; }
+.header h1 span { color: #7fff00; }
+.header p { color: rgba(255,255,255,0.7); font-size: 15px; margin-top: 8px; }
+.badges { display: flex; gap: 10px; justify-content: center; margin-top: 16px; flex-wrap: wrap; }
+.badge { font-size: 12px; padding: 4px 12px; border-radius: 20px; background: rgba(255,255,255,0.12); color: rgba(255,255,255,0.85); border: 1px solid rgba(255,255,255,0.2); }
+
+/* MAIN */
+.main { max-width: 860px; margin: 0 auto; padding: 32px 20px; }
+
+/* SEARCH BOX */
+.search-card { background: white; border-radius: 16px; padding: 32px; box-shadow: 0 4px 24px rgba(0,0,0,0.08); margin-bottom: 28px; }
+.search-card h2 { font-size: 20px; font-weight: 700; margin-bottom: 6px; }
+.search-card p { color: var(--muted); font-size: 14px; margin-bottom: 24px; }
+.input-row { display: flex; gap: 10px; }
+.url-input {
+  flex: 1; padding: 14px 18px; border: 2px solid var(--border);
+  border-radius: 10px; font-size: 15px; outline: none;
+  transition: border-color 0.2s;
+}
+.url-input:focus { border-color: var(--primary); }
+.btn-analyze {
+  padding: 14px 28px; background: var(--primary); color: white;
+  border: none; border-radius: 10px; font-size: 15px; font-weight: 600;
+  cursor: pointer; transition: background 0.2s; white-space: nowrap;
+}
+.btn-analyze:hover { background: var(--primary-light); }
+.btn-analyze:disabled { background: #aaa; cursor: not-allowed; }
+
+/* EXAMPLES */
+.examples { margin-top: 18px; }
+.examples p { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.example-chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chip {
+  font-size: 12px; padding: 5px 12px; border-radius: 20px;
+  background: var(--gray); border: 1px solid var(--border);
+  cursor: pointer; transition: all 0.15s; color: var(--text);
+}
+.chip:hover { background: #e8f5e9; border-color: var(--primary); }
+.chip.danger  { background: #fff0f0; border-color: #ffaaaa; }
+.chip.danger:hover { background: #ffe0e0; }
+
+/* LOADING */
+.loading { display: none; text-align: center; padding: 40px; }
+.spinner {
+  width: 44px; height: 44px; border: 4px solid var(--border);
+  border-top-color: var(--primary); border-radius: 50%;
+  animation: spin 0.8s linear infinite; margin: 0 auto 16px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* RESULT CARD */
+.result-card { display: none; background: white; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 24px rgba(0,0,0,0.1); margin-bottom: 28px; }
+
+/* RESULT HEADER */
+.result-header { padding: 28px 32px; display: flex; align-items: center; gap: 20px; }
+.result-header.safe     { background: #f0fff4; border-bottom: 3px solid var(--green); }
+.result-header.suspect  { background: #fffff0; border-bottom: 3px solid var(--yellow); }
+.result-header.danger   { background: #fff5f0; border-bottom: 3px solid var(--orange); }
+.result-header.critical { background: #fff0f0; border-bottom: 3px solid var(--red); }
+.verdict-icon { font-size: 48px; }
+.verdict-text h3 { font-size: 22px; font-weight: 800; }
+.verdict-text.safe h3     { color: var(--green); }
+.verdict-text.suspect h3  { color: var(--yellow); }
+.verdict-text.danger h3   { color: var(--orange); }
+.verdict-text.critical h3 { color: var(--red); }
+.verdict-text p { font-size: 14px; color: var(--muted); margin-top: 4px; font-family: monospace; }
+
+/* SCORE BAR */
+.score-section { padding: 20px 32px; background: #fafafa; border-bottom: 1px solid var(--border); }
+.score-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.score-label { font-size: 13px; font-weight: 600; color: var(--muted); }
+.score-num { font-size: 28px; font-weight: 900; }
+.score-bar-bg { height: 10px; background: #e8e8e8; border-radius: 5px; overflow: hidden; }
+.score-bar-fill { height: 100%; border-radius: 5px; transition: width 0.8s ease; }
+
+/* REASONS */
+.reasons-section { padding: 24px 32px; border-bottom: 1px solid var(--border); }
+.reasons-section h4 { font-size: 14px; font-weight: 700; margin-bottom: 14px; color: var(--text); }
+.reason-item { display: flex; gap: 12px; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; }
+.reason-item.safe    { background: #f0fff4; }
+.reason-item.warning { background: #fffff0; }
+.reason-item.danger  { background: #fff5f0; }
+.reason-item.info    { background: #f0f4ff; }
+.reason-icon { font-size: 18px; flex-shrink: 0; }
+.reason-content strong { font-size: 13px; font-weight: 600; display: block; }
+.reason-content p { font-size: 12px; color: var(--muted); margin-top: 2px; line-height: 1.5; }
+
+/* RECOMMANDATIONS */
+.reco-section { padding: 20px 32px; border-bottom: 1px solid var(--border); }
+.reco-section h4 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+.reco-item { font-size: 13px; padding: 7px 0; border-bottom: 1px solid #f0f0f0; color: var(--text); }
+.reco-item:last-child { border: none; }
+
+/* FEATURES */
+.features-section { padding: 20px 32px; }
+.features-section h4 { font-size: 14px; font-weight: 700; margin-bottom: 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.feat-item { background: var(--gray); border-radius: 6px; padding: 8px 10px; }
+.feat-name { font-size: 11px; color: var(--muted); }
+.feat-val  { font-size: 15px; font-weight: 700; margin-top: 2px; }
+.feat-val.bad  { color: var(--red); }
+.feat-val.good { color: var(--green); }
+
+/* STATS */
+.stats-bar { display: flex; gap: 0; background: var(--primary); }
+.stat-item { flex: 1; padding: 16px; text-align: center; border-right: 1px solid rgba(255,255,255,0.1); }
+.stat-item:last-child { border: none; }
+.stat-num { font-size: 26px; font-weight: 800; color: white; }
+.stat-lbl { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* INFO CARDS */
+.info-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin-bottom: 28px; }
+.info-card { background: white; border-radius: 12px; padding: 20px; border: 1px solid var(--border); }
+.info-card h4 { font-size: 14px; font-weight: 700; margin-bottom: 10px; }
+.info-card p  { font-size: 13px; color: var(--muted); line-height: 1.6; }
+
+/* FOOTER */
+footer { text-align: center; padding: 28px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); }
+footer strong { color: var(--primary); }
+
+/* RESPONSIVE */
+@media (max-width: 600px) {
+  .input-row { flex-direction: column; }
+  .features-grid { grid-template-columns: repeat(2, 1fr); }
+  .info-grid { grid-template-columns: 1fr; }
+  .result-header { flex-direction: column; text-align: center; }
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="header-inner">
+    <div class="flag">🇨🇲</div>
+    <h1>Camer<span>Phish</span></h1>
+    <p>Détecteur de sites de phishing — Spécialisé Cameroun</p>
+    <div class="badges">
+      <span class="badge">🤖 Machine Learning</span>
+      <span class="badge">🔐 22 features analysées</span>
+      <span class="badge">🏦 Contexte Mobile Money</span>
+      <span class="badge">🎓 Projet Cybersécurité</span>
+    </div>
+  </div>
+</div>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-item"><div class="stat-num">22</div><div class="stat-lbl">Features</div></div>
+  <div class="stat-item"><div class="stat-num">500+</div><div class="stat-lbl">URLs entraînées</div></div>
+  <div class="stat-item"><div class="stat-num">RF</div><div class="stat-lbl">Random Forest</div></div>
+  <div class="stat-item"><div class="stat-num">🇨🇲</div><div class="stat-lbl">Contexte local</div></div>
+</div>
+
+<div class="main">
+
+  <!-- ZONE D'ANALYSE -->
+  <div class="search-card">
+    <h2>🔍 Analyser une URL</h2>
+    <p>Collez un lien reçu par SMS, WhatsApp ou email pour vérifier s'il s'agit d'un site de phishing.</p>
+
+    <div class="input-row">
+      <input type="text" class="url-input" id="urlInput"
+             placeholder="https://www.exemple.com ou http://mtn-verify.tk/login"
+             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button class="btn-analyze" id="analyzeBtn" onclick="analyzeURL()">
+        Analyser →
+      </button>
+    </div>
+
+    <div class="examples">
+      <p>Exemples à tester :</p>
+      <div class="example-chips">
+        <span class="chip" onclick="fillExample('https://www.mtn.cm/fr/')">✅ mtn.cm (légitime)</span>
+        <span class="chip" onclick="fillExample('https://www.orange.cm/')">✅ orange.cm (légitime)</span>
+        <span class="chip" onclick="fillExample('https://www.afrilandbank.com/')">✅ Afriland (légitime)</span>
+        <span class="chip danger" onclick="fillExample('http://mtn-mobilemoney-cm-secure.000webhostapp.com/login')">⚠️ Phishing MTN</span>
+        <span class="chip danger" onclick="fillExample('http://orange-money-cm-recharge.000webhostapp.com/')">⚠️ Phishing Orange</span>
+        <span class="chip danger" onclick="fillExample('http://41.204.63.12/afriland-login')">⚠️ IP directe</span>
+        <span class="chip danger" onclick="fillExample('http://bourse-france-cameroun-2024.blogspot.com/')">⚠️ Fausse bourse</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- LOADING -->
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Analyse en cours... <br><small>Extraction des features et prédiction ML</small></p>
+  </div>
+
+  <!-- RÉSULTAT -->
+  <div class="result-card" id="resultCard">
+    <div class="result-header" id="resultHeader">
+      <div class="verdict-icon" id="verdictIcon"></div>
+      <div class="verdict-text" id="verdictText">
+        <h3 id="verdictTitle"></h3>
+        <p id="verdictURL"></p>
+      </div>
+    </div>
+
+    <!-- SCORE -->
+    <div class="score-section">
+      <div class="score-row">
+        <span class="score-label">Score de risque phishing</span>
+        <span class="score-num" id="scoreNum"></span>
+      </div>
+      <div class="score-bar-bg">
+        <div class="score-bar-fill" id="scoreBar"></div>
+      </div>
+    </div>
+
+    <!-- RAISONS -->
+    <div class="reasons-section">
+      <h4>📋 Indicateurs détectés</h4>
+      <div id="reasonsList"></div>
+    </div>
+
+    <!-- RECOMMANDATIONS -->
+    <div class="reco-section">
+      <h4>💡 Recommandations</h4>
+      <div id="recoList"></div>
+    </div>
+
+    <!-- FEATURES TECHNIQUES -->
+    <div class="features-section">
+      <h4 onclick="toggleFeatures()">🔧 Détail technique (features ML) <span id="toggleArrow">▼</span></h4>
+      <div id="featuresGrid" class="features-grid" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- INFO CARDS -->
+  <div class="info-grid">
+    <div class="info-card">
+      <h4>🏦 Mobile Money au Cameroun</h4>
+      <p>Les arnaques Mobile Money (MTN MoMo, Orange Money) sont les plus fréquentes. Vérifiez toujours que l'URL contient <strong>mtn.cm</strong> ou <strong>orange.cm</strong> officiel avant d'entrer votre code PIN.</p>
+    </div>
+    <div class="info-card">
+      <h4>🎓 Bourses et Recrutements</h4>
+      <p>Les fausses offres de bourse et de recrutement ciblent les étudiants. Les annonces officielles passent par les sites <strong>.gov.cm</strong> ou <strong>.cm</strong> des institutions.</p>
+    </div>
+    <div class="info-card">
+      <h4>🔒 Signes d'un site sûr</h4>
+      <p>HTTPS (cadenas 🔒), domaine court et reconnu, extension <strong>.cm</strong> pour les services camerounais. En cas de doute, tapez l'URL vous-même au lieu de cliquer.</p>
+    </div>
+    <div class="info-card">
+      <h4>📢 Signaler une arnaque</h4>
+      <p>Si vous avez été victime d'une arnaque en ligne, contactez l'<strong>ANTIC Cameroun</strong> : <a href="https://www.antic.cm" style="color:var(--primary)">www.antic.cm</a> ou le <strong>CIRT</strong> national.</p>
+    </div>
+  </div>
+
+</div>
+
+<footer>
+  <strong>CamerPhish Detector</strong> — Projet de cybersécurité pour les entreprises camerounaises<br>
+  <small>Modèle : Random Forest | 22 features | Contexte Mobile Money & Phishing local 🇨🇲</small>
+</footer>
+
+<script>
+const API = "http://localhost:5000/api";
+
+function fillExample(url) {
+  document.getElementById("urlInput").value = url;
+  analyzeURL();
+}
+
+async function analyzeURL() {
+  const url = document.getElementById("urlInput").value.trim();
+  if (!url) { alert("Entrez une URL à analyser."); return; }
+
+  // UI: loading
+  document.getElementById("loading").style.display = "block";
+  document.getElementById("resultCard").style.display = "none";
+  document.getElementById("analyzeBtn").disabled = true;
+
+  try {
+    const res = await fetch(`${API}/analyze`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ url })
+    });
+    const data = await res.json();
+    if (data.error) { alert("Erreur: " + data.error); return; }
+    displayResult(data);
+  } catch (e) {
+    alert("Impossible de contacter l'API. L'application Flask est-elle démarrée ?");
+    console.error(e);
+  } finally {
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("analyzeBtn").disabled = false;
+  }
+}
+
+function displayResult(data) {
+  const card    = document.getElementById("resultCard");
+  const header  = document.getElementById("resultHeader");
+  const icon    = document.getElementById("verdictIcon");
+  const text    = document.getElementById("verdictText");
+  const title   = document.getElementById("verdictTitle");
+  const urlEl   = document.getElementById("verdictURL");
+  const scoreEl = document.getElementById("scoreNum");
+  const barEl   = document.getElementById("scoreBar");
+
+  // Niveau de risque → style
+  const levelMap = {
+    "critical": { cls: "critical", ico: "🚨", msg: "PHISHING DÉTECTÉ — Très dangereux" },
+    "high":     { cls: "danger",   ico: "🔴", msg: "PHISHING PROBABLE — Évitez ce site" },
+    "medium":   { cls: "suspect",  ico: "🟡", msg: "SUSPECT — Vérifiez avant d'utiliser" },
+    "low":      { cls: "suspect",  ico: "🟠", msg: "Légèrement suspect" },
+    "safe":     { cls: "safe",     ico: "✅", msg: "Site probablement légitime" }
+  };
+  const level = levelMap[data.risk_level] || levelMap["safe"];
+
+  header.className = `result-header ${level.cls}`;
+  icon.textContent = level.ico;
+  text.className   = `verdict-text ${level.cls}`;
+  title.textContent = level.msg;
+  urlEl.textContent = data.url.length > 70 ? data.url.substring(0,67) + "..." : data.url;
+
+  // Score
+  const scoreColor = data.score >= 60 ? "#c0392b" : data.score >= 40 ? "#e67e22" : "#27ae60";
+  scoreEl.textContent = data.score + "/100";
+  scoreEl.style.color = scoreColor;
+  barEl.style.width = data.score + "%";
+  barEl.style.background = `linear-gradient(90deg, #27ae60, ${scoreColor})`;
+
+  // Raisons
+  const reasonsList = document.getElementById("reasonsList");
+  reasonsList.innerHTML = data.reasons.map(r => `
+    <div class="reason-item ${r.severity}">
+      <span class="reason-icon">${r.icon}</span>
+      <div class="reason-content">
+        <strong>${r.text}</strong>
+        <p>${r.detail}</p>
+      </div>
+    </div>
+  `).join("");
+
+  // Recommandations
+  const recoList = document.getElementById("recoList");
+  recoList.innerHTML = data.recommendations.map(r =>
+    `<div class="reco-item">${r}</div>`
+  ).join("");
+
+  // Features techniques
+  const featGrid = document.getElementById("featuresGrid");
+  const f = data.features;
+  const featDisplay = [
+    { name: "HTTP non sécurisé", val: f.is_http, bad: f.is_http === 1 },
+    { name: "IP directe", val: f.has_ip_address, bad: f.has_ip_address === 1 },
+    { name: "TLD suspect", val: f.suspicious_tld, bad: f.suspicious_tld === 1 },
+    { name: "Hébergeur gratuit", val: f.free_hosting, bad: f.free_hosting === 1 },
+    { name: "Symbole @", val: f.has_at_symbol, bad: f.has_at_symbol === 1 },
+    { name: "Encodage %", val: f.has_encoding, bad: f.has_encoding === 1 },
+    { name: "Longueur URL", val: f.url_length, bad: f.url_length > 75 },
+    { name: "Nb tirets", val: f.count_hyphens, bad: f.count_hyphens >= 3 },
+    { name: "Nb points", val: f.count_dots, bad: f.count_dots > 4 },
+    { name: "Entropie domaine", val: f.domain_entropy, bad: f.domain_entropy > 3.5 },
+    { name: "Mots-clés sensibles", val: f.sensitive_keywords, bad: f.sensitive_keywords > 0 },
+    { name: "Domaine .cm", val: f.is_cm_tld ? "Oui" : "Non", bad: false, good: f.is_cm_tld === 1 },
+  ];
+  featGrid.innerHTML = featDisplay.map(f => `
+    <div class="feat-item">
+      <div class="feat-name">${f.name}</div>
+      <div class="feat-val ${f.bad ? 'bad' : f.good ? 'good' : ''}">${f.val}</div>
+    </div>
+  `).join("");
+
+  // Afficher
+  card.style.display = "block";
+  card.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function toggleFeatures() {
+  const grid  = document.getElementById("featuresGrid");
+  const arrow = document.getElementById("toggleArrow");
+  const show  = grid.style.display === "none";
+  grid.style.display = show ? "grid" : "none";
+  arrow.textContent  = show ? "▲" : "▼";
+}
+
+// Analyser au Enter
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("urlInput").addEventListener("keydown", e => {
+    if (e.key === "Enter") analyzeURL();
+  });
+});
+</script>
+</body>
+</html>
